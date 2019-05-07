@@ -1,9 +1,6 @@
 package me.cynadyde.barrelsplus;
 
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
@@ -128,37 +125,45 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
         // Create the barrel item that will be dropped...
         ItemStack barrelItem = new ItemStack(Material.BARREL, 1);
-        BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
 
-        if (barrelMeta == null) {
-            getLogger().warning("BlockStateMeta for new ItemStack of Material.BARREL was null");
-            return;
-        }
-        Barrel barrelState = (Barrel) barrelMeta.getBlockState();
+        // Add custom name to the barrel if it existed on the block...
+        String customName = ((Barrel) block.getState()).getCustomName();
 
-        // Set the barrel item's inventory...
-        barrelState.getInventory().setContents(items);
+        if (customName != null) {
+            BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
 
-        getLogger().info("Here are the items in the barrel item-meta block-state:");
-
-        for (ItemStack item : barrelState.getInventory().getContents()) {
-            if (item != null) {
-                getLogger().info(String.format(" ... item: %s x%d", item.getType(), item.getAmount()));
+            // Get any NBT data that was already on the old barrel block...
+            if (barrelMeta == null) {
+                getLogger().warning("BlockStateMeta for new ItemStack of Material.BARREL was null");
+                return;
             }
+            barrelMeta.setDisplayName(customName);
+            barrelItem.setItemMeta(barrelMeta);
         }
-
-        barrelMeta.setBlockState(barrelState);
 
         // If the barrel item contains items...
         if (description.size() > 0) {
 
-            // Set an informative custom display name
-            if (!barrelMeta.hasDisplayName()) {
+            BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
 
-                barrelMeta.setDisplayName(formatted("&rLoaded Barrel"));
+            if (barrelMeta == null) {
+                getLogger().warning("BlockStateMeta for new ItemStack of Material.BARREL was null");
+                return;
             }
 
-            // Set an informative lore if the barrel contains items
+            // Set the barrel item's inventory...
+            Barrel barrelState = (Barrel) barrelMeta.getBlockState();
+            barrelState.getInventory().setContents(items);
+            barrelMeta.setBlockState(barrelState);
+
+            getLogger().info("Here are the items in the barrel item-meta block-state:");
+
+            for (ItemStack item : barrelState.getInventory().getContents()) {
+                if (item != null) {
+                    getLogger().info(String.format(" ... item: %s x%d", item.getType(), item.getAmount()));
+                }
+            }
+            // Set an informative lore...
             List<String> lore = barrelMeta.getLore();
             if (lore == null) {
                 lore = new ArrayList<>();
@@ -168,17 +173,6 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
             barrelMeta.setLore(lore);
 
             barrelItem.setItemMeta(barrelMeta);
-        }
-
-        else {
-            // If the barrel is empty, remove the custom display name and block entity...
-            if (barrelMeta.hasDisplayName()) {
-                if (barrelMeta.getDisplayName().equals(formatted("&rLoaded Barrel"))) {
-                    getLogger().info("The barrel was empty, and it had a custom name somehow? Removing...");
-                    // barrelMeta.setDisplayName(null);
-                    barrelItem.setItemMeta(null);
-                }
-            }
         }
 
 

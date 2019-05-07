@@ -1,0 +1,11 @@
+main: me.cynadyde.barrelsplus.BarrelsPlusPlugin
+name: BarrelsPlus
+prefix: Barrels+
+version: 0.0.3
+api-version: 1.14
+description: Barrels retain their contents when broken.
+website: null
+authors: [Cynadyde (May 2019)]
+depend: []
+commands: {}
+permissions: {}
