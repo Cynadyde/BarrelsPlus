@@ -1,6 +1,9 @@
 package me.cynadyde.barrelsplus;
 
-import org.bukkit.*;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
@@ -19,7 +22,8 @@ import java.util.List;
 
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
-    private String formatted(String message, Object...objs) {
+    /* applies String.format and ChatColor.translateAlternateColorCodes */
+    private String formatted(String message, Object... objs) {
         return String.format(ChatColor.translateAlternateColorCodes('&', message), objs);
     }
 
@@ -27,11 +31,6 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
 
         getServer().getPluginManager().registerEvents(this, this);
-    }
-
-    @Override
-    public void onDisable() {
-
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
@@ -44,68 +43,67 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        getLogger().info("A barrel is being broken...");
+        // Get the location and world...
+        Location loc = event.getBlock().getLocation();
+        World world = loc.getWorld();
+
+        if (world == null) {
+            return;
+        }
+
+        Barrel blockState = (Barrel) block.getState();
 
         // Create a list for the items that will be dropped...
-        List<ItemStack> droppedItems = new ArrayList<>();
+        List<ItemStack> eventDrops = new ArrayList<>();
 
         // Get the contents of the barrel being broken...
-        ItemStack[] items = ((Barrel) (block.getState())).getSnapshotInventory().getContents();
+        ItemStack[] blockContents = blockState.getSnapshotInventory().getContents();
 
-        // If there are any other barrels with contents in this inventory, separate them out
-        // At the same time, start building a list of item names for the lore
+        // Create a list to hold the names of the first five items...
+        List<String> items = new ArrayList<>();
 
-        List<String> description = new ArrayList<>();
+        // For each item in the block's inventory...
+        blockContentsLoop:
+        for (int i = 0; i < blockContents.length; i++) {
 
-        for (int i = 0; i < items.length; i++) {
-
-            ItemStack item = items[i];
+            ItemStack item = blockContents[i];
 
             if (item != null) {
 
-                getLogger().info(String.format(" ... contains %s x%d", item.getType(), item.getAmount()));
-
+                // If the item is a container...
                 if (item.getType().equals(Material.BARREL)) {
 
                     BlockStateMeta itemMeta = (BlockStateMeta) item.getItemMeta();
+                    if (itemMeta == null) {
+                        continue;
+                    }
 
-                    if (itemMeta != null) {
+                    // If the container has anything inside it...
+                    Container itemState = (Container) itemMeta.getBlockState();
 
-                        // !!! assuming the block state can be cast to a container
-                        ItemStack[] itemContents = ((Container) itemMeta.getBlockState()).getInventory().getContents();
-                        boolean itemHasContents = false;
+                    for (ItemStack nestedItem : itemState.getInventory().getContents()) {
+                        if (nestedItem != null) {
 
-                        for (ItemStack itemContent : itemContents) {
-                            if (itemContent != null) {
-                                itemHasContents = true;
-                                break;
-                            }
-                        }
-                        if (itemHasContents) {
-                            items[i] = null;
-                            droppedItems.add(item);
+                            // Separate it from the inventory into a separate drop...
+                            blockContents[i] = null;
+                            eventDrops.add(item);
 
-                            getLogger().info(" ... ... this barrel contained items!");
-
-                            continue;
-
-                        }
-                        else {
-                            getLogger().info(" ... ... this barrel was empty!");
+                            continue blockContentsLoop;
                         }
                     }
                 }
-
-                // Not sure why this isn't more elegant...
-                if (description.size() < 5) {
+                // Add the name of the item to the list...
+                if (items.size() < 5) {
                     String itemName = null;
 
+                    // Check if there is a custom display name...
                     ItemMeta itemMeta = item.getItemMeta();
                     if (itemMeta != null) {
                         if (itemMeta.hasDisplayName()) {
                             itemName = itemMeta.getDisplayName();
                         }
                     }
+                    // Create the name from the Material type...
                     if (itemName == null) {
                         itemName = item.getType().toString().replace('_', ' ').toLowerCase();
                         if (itemName.length() > 0) {
@@ -113,94 +111,64 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                                     + itemName.substring(1, itemName.length());
                         }
                     }
-
-                    description.add(formatted("&r&f%s x%d", itemName, item.getAmount()));
+                    items.add(formatted("&r&f%s x%d", itemName, item.getAmount()));
                 }
-                else if (description.size() == 5) {
-                    description.add(formatted("&f&oand %d more...", items.length - 1));
+
+                // Or, if the list already has five items, just add the number that is remaining...
+                else if (items.size() == 5) {
+                    items.add(formatted("&f&oand %d more...", blockContents.length - 1));
                 }
             }
-
         }
-
         // Create the barrel item that will be dropped...
         ItemStack barrelItem = new ItemStack(Material.BARREL, 1);
 
-        // Add custom name to the barrel if it existed on the block...
+
+        // If the barrel block had a custom name, add it to the barrel item...
         String customName = ((Barrel) block.getState()).getCustomName();
-
         if (customName != null) {
-            BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
 
-            // Get any NBT data that was already on the old barrel block...
+            BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
             if (barrelMeta == null) {
-                getLogger().warning("BlockStateMeta for new ItemStack of Material.BARREL was null");
                 return;
             }
             barrelMeta.setDisplayName(customName);
             barrelItem.setItemMeta(barrelMeta);
         }
 
-        // If the barrel item contains items...
-        if (description.size() > 0) {
+        // If the barrel block contained any items...
+        if (items.size() > 0) {
 
             BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
-
             if (barrelMeta == null) {
-                getLogger().warning("BlockStateMeta for new ItemStack of Material.BARREL was null");
                 return;
             }
-
             // Set the barrel item's inventory...
             Barrel barrelState = (Barrel) barrelMeta.getBlockState();
-            barrelState.getInventory().setContents(items);
+            barrelState.getInventory().setContents(blockContents);
             barrelMeta.setBlockState(barrelState);
 
-            getLogger().info("Here are the items in the barrel item-meta block-state:");
-
-            for (ItemStack item : barrelState.getInventory().getContents()) {
-                if (item != null) {
-                    getLogger().info(String.format(" ... item: %s x%d", item.getType(), item.getAmount()));
-                }
-            }
             // Set an informative lore...
             List<String> lore = barrelMeta.getLore();
             if (lore == null) {
                 lore = new ArrayList<>();
             }
-
-            lore.addAll(0, description);
+            lore.addAll(0, items);
             barrelMeta.setLore(lore);
 
             barrelItem.setItemMeta(barrelMeta);
         }
 
-
         // Add the barrel item to the list of items being dropped...
-        droppedItems.add(barrelItem);
+        eventDrops.add(barrelItem);
 
         // Cancel what would drop normally...
-        ((Barrel) event.getBlock().getState()).getInventory().setContents(new ItemStack[0]);
+        blockState.getInventory().setContents(new ItemStack[0]);
         event.setDropItems(false);
 
         // Drop the barrel item and any separated items...
-        Location loc = event.getBlock().getLocation();
-        World world = loc.getWorld();
-
-        if (world == null) {
-            getLogger().warning("World of BlockBreakEvent Block was null");
-            return;
-        }
-
-        getLogger().info("Dropping items:");
-
-        for (ItemStack item : droppedItems) {
-
-            getLogger().info(String.format(" ... dropping item: %s", item));
-
+        for (ItemStack item : eventDrops) {
             world.dropItemNaturally(loc, item);
         }
-
-        getLogger().info("BreakBlockEvent finished!");
     }
 }

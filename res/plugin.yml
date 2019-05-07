@@ -1,11 +1,13 @@
 main: me.cynadyde.barrelsplus.BarrelsPlusPlugin
 name: BarrelsPlus
-prefix: Barrels+
-version: 0.0.3
+version: 1.0.0
 api-version: 1.14
-description: Barrels retain their contents when broken.
+description: >
+  Barrels now keep their inventory when broken! Unlike Shulker Boxes,
+  however, barrels will drop any containers nested inside them.
 website: null
-authors: [Cynadyde (May 2019)]
+authors:
+  - Cynadyde (May 2019)
 depend: []
 commands: {}
 permissions: {}
