@@ -20,9 +20,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+/**
+ * Barrels can be picked up with all of their contents kept inside.
+ * Any nested containers that are not empty will fall out.
+ */
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
-    /* applies String.format and ChatColor.translateAlternateColorCodes */
+    /**
+     * Translates ampersands into color codes, then formats the string.
+     */
     private String formatted(String message, Object... objs) {
         return String.format(ChatColor.translateAlternateColorCodes('&', message), objs);
     }
@@ -33,6 +39,9 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
     }
 
+    /**
+     * Keep contents inside of barrels when they are picked up.
+     */
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onBlockBreak(BlockBreakEvent event) {
 

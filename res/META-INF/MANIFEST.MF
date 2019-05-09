@@ -1,3 +1,4 @@
 Manifest-Version: 1.0
-Main-Class: me.cynadyde.barrelsplus.BarrelsPlusPlugin
+Class-Path: me.cynadyde.barrelsplus
+Main-Class: BarrelsPlusPlugin
 
