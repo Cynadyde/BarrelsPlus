@@ -21,8 +21,7 @@ import java.util.List;
 
 
 /**
- * Barrels can be picked up with all of their contents kept inside.
- * Any nested containers that are not empty will fall out.
+ * Main class of the BarrelsPlus plugin.
  */
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
