@@ -1,7 +1,7 @@
 main: me.cynadyde.barrelsplus.BarrelsPlusPlugin
 name: BarrelsPlus
 prefix: Barrels+
-version: 1.0.0
+version: 1.14-0
 api-version: 1.14
 description: >
   Barrels now keep their inventory when broken! However,
