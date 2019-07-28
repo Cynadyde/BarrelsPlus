@@ -22,6 +22,7 @@ import java.util.List;
 
 /**
  * Main class of the BarrelsPlus plugin.
+ * @noinspection unused
  */
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
@@ -41,8 +42,12 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     /**
      * Keep contents inside of barrels when they are picked up.
      */
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event) {
+
+        if (!event.isDropItems()) {
+            return;
+        }
 
         Block block = event.getBlock();
 
@@ -115,8 +120,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                     if (itemName == null) {
                         itemName = item.getType().toString().replace('_', ' ').toLowerCase();
                         if (itemName.length() > 0) {
-                            itemName = itemName.substring(0, 1).toUpperCase()
-                                    + itemName.substring(1, itemName.length());
+                            itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1);
                         }
                     }
                     items.add(formatted("&r&f%s x%d", itemName, item.getAmount()));
