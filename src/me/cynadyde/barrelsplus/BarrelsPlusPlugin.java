@@ -128,9 +128,16 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                 }
             }
         }
+
+        // if the barrel is empty and we are in creative mode, quit...
+        if (items.isEmpty() && eventDrops.isEmpty()) {
+            if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+                return;
+            }
+        }
+
         // create the barrel item that will be dropped...
         ItemStack barrelItem = new ItemStack(Material.BARREL, 1);
-
 
         // if the barrel block had a custom name, add it to the barrel item...
         String customName = ((Barrel) block.getState()).getCustomName();
