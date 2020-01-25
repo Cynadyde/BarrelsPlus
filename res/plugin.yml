@@ -1,11 +1,10 @@
 main: me.cynadyde.barrelsplus.BarrelsPlusPlugin
 name: BarrelsPlus
-prefix: Barrels+
-version: "1.14.4-0"
+version: "1.15.2-0"
 api-version: "1.14"
 description: >
   Barrels keep their inventory when broken! However, they
-  they still drop any non-empty containers nested inside them.
+  they still drop out any non-empty containers nested inside.
 website: https://www.spigotmc.org/resources/barrelsplus.67224/
 authors:
   - Cynadyde (May 2019)
