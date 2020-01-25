@@ -9,7 +9,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.inventory.FurnaceBurnEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -26,8 +30,31 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     /**
      * Translates ampersands into color codes, then formats the string.
      */
-    private String chatFormat(String message, Object... objs) {
+    private static String chatFormat(String message, Object... objs) {
         return String.format(ChatColor.translateAlternateColorCodes('&', message), objs);
+    }
+
+    /**
+     * Tests if the given item stack is a barrel that has contents.
+     */
+    private static boolean isNonEmptyBarrel(ItemStack item) {
+
+        if (item != null && item.getType() == Material.BARREL
+                && item.getItemMeta() instanceof BlockStateMeta) {
+
+            BlockStateMeta barrelItemState = (BlockStateMeta) item.getItemMeta();
+            if (barrelItemState.getBlockState() instanceof Barrel) {
+                Barrel barrel = (Barrel) barrelItemState.getBlockState();
+
+                for (ItemStack content : barrel.getInventory().getContents()) {
+                    //noinspection ConstantConditions
+                    if (content != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Override
@@ -36,44 +63,88 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     }
 
     /**
-     * Prevents barrels with contents from being burnt in a furnace.
+     * Prevents barrels with contents from being placed into a furnace.
      */
     @EventHandler(priority = EventPriority.NORMAL)
-    public void onFurnaceBurn(FurnaceBurnEvent event) {
+    public void onInventoryClickEvent(InventoryClickEvent event) {
 
-        //getLogger().info("[DEBUG] onFurnaceBurn()");
+        getLogger().info("[DEBUG] onInventoryClick()");
+        getLogger().info("[DEBUG]   cursor = " + event.getCursor());
+        getLogger().info("[DEBUG]   currentItem = " + event.getCurrentItem());
+        getLogger().info("[DEBUG]   hotbarKey = " + event.getHotbarButton());
+        getLogger().info("[DEBUG]   slotType = " + event.getSlotType());
+        getLogger().info("[DEBUG]   getAction = " + event.getAction());
+        getLogger().info("[DEBUG]   inventoryType = " + event.getInventory().getType() + " " + ((event.getInventory() instanceof FurnaceInventory) ? "yes" : "no"));
+        getLogger().info("[DEBUG]   clickedInvType = " + ((event.getClickedInventory() == null) ? null : event.getClickedInventory().getType()));
 
-        // if a barrel is being used as fuel in a furnace...
-        if (event.getFuel().getType() != Material.BARREL) {
+        if (!(event.getInventory() instanceof FurnaceInventory)) {
+            getLogger().info("[DEBUG] WHY AM I NOT A FURNACE INVENTORY???");
             return;
         }
+        switch (event.getAction()) {
 
-        //getLogger().info("[DEBUG]   a barrel is being cooked :O");
+            default: break;
 
-        // if the barrel has any contents, cancel the event...
-        ItemStack barrelItem = event.getFuel();
-        if (barrelItem.getItemMeta() instanceof BlockStateMeta) {
+            case PLACE_ONE:
+            case PLACE_SOME:
+            case PLACE_ALL:
+            case SWAP_WITH_CURSOR:
 
-            BlockStateMeta barrelItemState = (BlockStateMeta) barrelItem.getItemMeta();
-            if (barrelItemState.getBlockState() instanceof Barrel) {
-                Barrel barrel = (Barrel) barrelItemState.getBlockState();
-
-                //getLogger().info("[DEBUG]     barrel has a block state");
-
-                for (ItemStack item : barrel.getInventory().getContents()) {
-                    //noinspection ConstantConditions
-                    if (item != null) {
-
-                        //getLogger().info("[DEBUG]      barrel had an item!");
-                        //getLogger().info("[DEBUG]      CANCELLED EVENT");
-
+                if (event.getSlotType() == InventoryType.SlotType.FUEL) {
+                    if (isNonEmptyBarrel(event.getCursor())) {
+                        getLogger().info("[DEBUG]     cancelling event!");
                         event.setCancelled(true);
-                        return;
                     }
                 }
-            }
-        }
+                break;
 
+            case HOTBAR_SWAP:
+
+                if (event.getSlotType() == InventoryType.SlotType.FUEL) {
+                    if (isNonEmptyBarrel(event.getWhoClicked().getInventory().getItem(event.getHotbarButton()))) {
+                        getLogger().info("[DEBUG]     cancelling event!");
+                        event.setCancelled(true);
+                    }
+                }
+                break;
+        }
+    }
+
+    /**
+     * Prevents barrels with contents from being dragged into a furnace.
+     */
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onInventoryDrag(InventoryDragEvent event) {
+
+        getLogger().info("[DEBUG] onInventoryDrag()");
+        getLogger().info("[DEBUG]   cursor = " + event.getCursor());
+        getLogger().info("[DEBUG]   oldCursor = " + event.getOldCursor());
+        getLogger().info("[DEBUG]   invType = " + event.getInventory().getType());
+        getLogger().info("[DEBUG]   invSlots = " + event.getInventorySlots());
+        getLogger().info("[DEBUG]   rawSlots = " + event.getRawSlots());
+        getLogger().info("[DEBUG]   type = " + event.getType());
+
+        // if a barrel is being dragged into a furnace...
+        // TODO
+    }
+
+    /**
+     * Prevents barrels with contents from being sucked into a furnace.
+     */
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onInventoryMoveItem(InventoryMoveItemEvent event) {
+
+        getLogger().info("[DEBUG] onInventoryMoveItem()");
+        getLogger().info("[DEBUG]   item = " + event.getItem());
+        getLogger().info("[DEBUG]   source = " + event.getSource().getType());
+        getLogger().info("[DEBUG]   dest = " + event.getDestination().getType());
+
+        if ((event.getDestination() instanceof FurnaceInventory)
+                && isNonEmptyBarrel(event.getItem())) {
+
+            getLogger().info("[DEBUG]     event cancelled!");
+            event.setCancelled(true);
+        }
     }
 
     /**
