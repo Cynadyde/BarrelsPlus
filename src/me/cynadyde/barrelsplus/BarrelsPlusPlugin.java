@@ -25,55 +25,45 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     /**
      * Translates ampersands into color codes, then formats the string.
      */
-    private String formatted(String message, Object... objs) {
+    private String chatFormat(String message, Object... objs) {
         return String.format(ChatColor.translateAlternateColorCodes('&', message), objs);
     }
 
     @Override
-
     public void onEnable() {
-
         getServer().getPluginManager().registerEvents(this, this);
     }
 
     /**
      * Keep contents inside of barrels when they are picked up.
      */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
 
         // make sure the event is meant to drop items...
-        if (!event.isDropItems()) {
+        if (event.isCancelled() || !event.isDropItems()) {
             return;
         }
 
         Block block = event.getBlock();
-
-        // make sure that the block being broken is a barrel...
         if (block.getType() != Material.BARREL) {
             return;
         }
 
-        // get the location and world...
         Location loc = event.getBlock().getLocation();
         World world = loc.getWorld();
-
         if (world == null) {
             return;
         }
 
         Barrel blockState = (Barrel) block.getState();
-
-        // create a list for the items that will be dropped...
-        List<ItemStack> eventDrops = new ArrayList<>();
-
-        // get the contents of the barrel being broken...
         ItemStack[] blockContents = blockState.getSnapshotInventory().getContents();
 
-        // create a list to hold the names of the first five items...
+        // create a list for the items that will be dropped for this event
+        // and a list to hold the names of the first five items...
+        List<ItemStack> eventDrops = new ArrayList<>();
         List<String> items = new ArrayList<>();
 
-        // for each item in the block's inventory...
         blockContentsLoop:
         for (int i = 0; i < blockContents.length; i++) {
 
@@ -83,27 +73,25 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
                 // if the item is a container...
                 if (item.getItemMeta() instanceof BlockStateMeta) {
-
                     BlockStateMeta itemBlockMeta = (BlockStateMeta) item.getItemMeta();
 
                     if (itemBlockMeta.getBlockState() instanceof Container) {
-
                         Container itemContainerMeta = (Container) itemBlockMeta.getBlockState();
 
                         // if the container has anything inside it...
                         for (ItemStack nestedItem : itemContainerMeta.getInventory().getContents()) {
+                            //noinspection ConstantConditions
                             if (nestedItem != null) {
 
                                 // separate the container from the inventory into a separate drop...
                                 blockContents[i] = null;
                                 eventDrops.add(item);
-
                                 continue blockContentsLoop;
                             }
                         }
                     }
                 }
-                // add the name of the item to the list...
+                // add the names of the first five items to the list...
                 if (items.size() < 5) {
                     String itemName = null;
 
@@ -115,18 +103,18 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                         }
                     }
                     // or, create the display name from its material type...
+                    // sorry that it is not translated based on locale!
                     if (itemName == null) {
-
                         itemName = WordUtils.capitalizeFully(item.getType().toString().replace("_", " "));
                     }
-                    items.add(formatted("&r&f%s x%d", itemName, item.getAmount()));
-                }
-
-                // or, if the list already has five items, lastly add the number that is remaining...
-                else if (items.size() == 5) {
-                    items.add(formatted("&f&oand %d more...", blockContents.length - 1));
+                    items.add(chatFormat("&r&f%s x%d", itemName, item.getAmount()));
                 }
             }
+        }
+
+        // if the list has five or more items, add the number that is remaining...
+        if (items.size() >= 5) {
+            items.add(chatFormat("&f&oand %d more...", blockContents.length - 1));
         }
 
         // if the barrel is empty and we are in creative mode, quit...
@@ -135,8 +123,6 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                 return;
             }
         }
-
-        // create the barrel item that will be dropped...
         ItemStack barrelItem = new ItemStack(Material.BARREL, 1);
 
         // if the barrel block had a custom name, add it to the barrel item...
