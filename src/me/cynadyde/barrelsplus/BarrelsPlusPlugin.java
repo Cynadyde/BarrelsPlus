@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -35,7 +36,48 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     }
 
     /**
-     * Keep contents inside of barrels when they are picked up.
+     * Prevents barrels with contents from being burnt in a furnace.
+     */
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onFurnaceBurn(FurnaceBurnEvent event) {
+
+        //getLogger().info("[DEBUG] onFurnaceBurn()");
+
+        // if a barrel is being used as fuel in a furnace...
+        if (event.getFuel().getType() != Material.BARREL) {
+            return;
+        }
+
+        //getLogger().info("[DEBUG]   a barrel is being cooked :O");
+
+        // if the barrel has any contents, cancel the event...
+        ItemStack barrelItem = event.getFuel();
+        if (barrelItem.getItemMeta() instanceof BlockStateMeta) {
+
+            BlockStateMeta barrelItemState = (BlockStateMeta) barrelItem.getItemMeta();
+            if (barrelItemState.getBlockState() instanceof Barrel) {
+                Barrel barrel = (Barrel) barrelItemState.getBlockState();
+
+                //getLogger().info("[DEBUG]     barrel has a block state");
+
+                for (ItemStack item : barrel.getInventory().getContents()) {
+                    //noinspection ConstantConditions
+                    if (item != null) {
+
+                        //getLogger().info("[DEBUG]      barrel had an item!");
+                        //getLogger().info("[DEBUG]      CANCELLED EVENT");
+
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+            }
+        }
+
+    }
+
+    /**
+     * Keeps contents inside of barrels when they are picked up.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
@@ -45,12 +87,11 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
             return;
         }
 
-        Block block = event.getBlock();
-        if (block.getType() != Material.BARREL) {
+        if (event.getBlock().getType() != Material.BARREL) {
             return;
         }
-
-        Location loc = event.getBlock().getLocation();
+        Block block = event.getBlock();
+        Location loc = block.getLocation();
         World world = loc.getWorld();
         if (world == null) {
             return;
@@ -58,17 +99,17 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
         Barrel blockState = (Barrel) block.getState();
         ItemStack[] blockContents = blockState.getSnapshotInventory().getContents();
+        int contentsCount = 0;
 
         // create a list for the items that will be dropped for this event
         // and a list to hold the names of the first five items...
         List<ItemStack> eventDrops = new ArrayList<>();
-        List<String> items = new ArrayList<>();
+        List<String> previewItems = new ArrayList<>();
 
         blockContentsLoop:
         for (int i = 0; i < blockContents.length; i++) {
 
             ItemStack item = blockContents[i];
-
             if (item != null) {
 
                 // if the item is a container...
@@ -83,7 +124,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                             //noinspection ConstantConditions
                             if (nestedItem != null) {
 
-                                // separate the container from the inventory into a separate drop...
+                                // separate the container into a separate event drop...
                                 blockContents[i] = null;
                                 eventDrops.add(item);
                                 continue blockContentsLoop;
@@ -92,7 +133,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                     }
                 }
                 // add the names of the first five items to the list...
-                if (items.size() < 5) {
+                if (previewItems.size() < 5) {
                     String itemName = null;
 
                     // check if there is a custom display name...
@@ -103,22 +144,23 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                         }
                     }
                     // or, create the display name from its material type...
-                    // sorry that it is not translated based on locale!
+                    // FIXME see if we can translate based on server locale!
                     if (itemName == null) {
                         itemName = WordUtils.capitalizeFully(item.getType().toString().replace("_", " "));
                     }
-                    items.add(chatFormat("&r&f%s x%d", itemName, item.getAmount()));
+                    previewItems.add(chatFormat("&r&f%s x%d", itemName, item.getAmount()));
                 }
+                contentsCount++;
             }
         }
 
         // if the list has five or more items, add the number that is remaining...
-        if (items.size() >= 5) {
-            items.add(chatFormat("&f&oand %d more...", blockContents.length - 1));
+        if (previewItems.size() >= 5) {
+            previewItems.add(chatFormat("&f&oand %d more...", contentsCount));
         }
 
         // if the barrel is empty and we are in creative mode, quit...
-        if (items.isEmpty() && eventDrops.isEmpty()) {
+        if (contentsCount == 0 && eventDrops.isEmpty()) {
             if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
                 return;
             }
@@ -137,7 +179,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         }
 
         // if the barrel block contained any items...
-        if (items.size() > 0) {
+        if (contentsCount > 0) {
 
             BlockStateMeta barrelMeta = (BlockStateMeta) barrelItem.getItemMeta();
             assert (barrelMeta != null);
@@ -152,7 +194,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
             if (lore == null) {
                 lore = new ArrayList<>();
             }
-            lore.addAll(0, items);
+            lore.addAll(0, previewItems);
             barrelMeta.setLore(lore);
 
             barrelItem.setItemMeta(barrelMeta);
@@ -165,7 +207,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         blockState.getInventory().setContents(new ItemStack[0]);
         event.setDropItems(false);
 
-        // drop the barrel item and any separated items...
+        // drop the barrel and any separated containers...
         for (ItemStack item : eventDrops) {
             world.dropItemNaturally(loc, item);
         }
