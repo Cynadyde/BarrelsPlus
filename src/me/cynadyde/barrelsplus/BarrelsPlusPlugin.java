@@ -9,10 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryMoveItemEvent;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.*;
 import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
@@ -63,87 +60,70 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     }
 
     /**
-     * Prevents barrels with contents from being placed into a furnace.
+     * Prevents barrels with contents from being burnt in a furnace.
      */
     @EventHandler(priority = EventPriority.NORMAL)
+    public void onFurnaceBurn(FurnaceBurnEvent event) {
+
+        if (isNonEmptyBarrel(event.getFuel())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Prevents barrels with contents from being placed into a furnace.
+     */
+    //@EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryClickEvent(InventoryClickEvent event) {
 
-        getLogger().info("[DEBUG] onInventoryClick()");
-        getLogger().info("[DEBUG]   cursor = " + event.getCursor());
-        getLogger().info("[DEBUG]   currentItem = " + event.getCurrentItem());
-        getLogger().info("[DEBUG]   hotbarKey = " + event.getHotbarButton());
-        getLogger().info("[DEBUG]   slotType = " + event.getSlotType());
-        getLogger().info("[DEBUG]   getAction = " + event.getAction());
-        getLogger().info("[DEBUG]   inventoryType = " + event.getInventory().getType() + " " + ((event.getInventory() instanceof FurnaceInventory) ? "yes" : "no"));
-        getLogger().info("[DEBUG]   clickedInvType = " + ((event.getClickedInventory() == null) ? null : event.getClickedInventory().getType()));
-
-        if (!(event.getInventory() instanceof FurnaceInventory)) {
-            getLogger().info("[DEBUG] WHY AM I NOT A FURNACE INVENTORY???");
-            return;
-        }
-        switch (event.getAction()) {
-
-            default: break;
-
-            case PLACE_ONE:
-            case PLACE_SOME:
-            case PLACE_ALL:
-            case SWAP_WITH_CURSOR:
-
-                if (event.getSlotType() == InventoryType.SlotType.FUEL) {
-                    if (isNonEmptyBarrel(event.getCursor())) {
-                        getLogger().info("[DEBUG]     cancelling event!");
-                        event.setCancelled(true);
-                    }
+        if (event.getInventory() instanceof FurnaceInventory) {
+            if (event.getSlotType() == InventoryType.SlotType.FUEL) {
+                switch (event.getAction()) {
+                    default: break;
+                    case PLACE_ONE:
+                    case PLACE_SOME:
+                    case PLACE_ALL:
+                    case SWAP_WITH_CURSOR:
+                        if (isNonEmptyBarrel(event.getCursor())) {
+                            event.setCancelled(true);
+                        }
+                        break;
+                    case HOTBAR_SWAP:
+                        if (isNonEmptyBarrel(event.getWhoClicked()
+                                .getInventory().getItem(event.getHotbarButton()))) {
+                            event.setCancelled(true);
+                        }
+                        break;
                 }
-                break;
-
-            case HOTBAR_SWAP:
-
-                if (event.getSlotType() == InventoryType.SlotType.FUEL) {
-                    if (isNonEmptyBarrel(event.getWhoClicked().getInventory().getItem(event.getHotbarButton()))) {
-                        getLogger().info("[DEBUG]     cancelling event!");
-                        event.setCancelled(true);
-                    }
-                }
-                break;
+            }
         }
     }
 
     /**
      * Prevents barrels with contents from being dragged into a furnace.
      */
-    @EventHandler(priority = EventPriority.NORMAL)
+    //@EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryDrag(InventoryDragEvent event) {
 
-        getLogger().info("[DEBUG] onInventoryDrag()");
-        getLogger().info("[DEBUG]   cursor = " + event.getCursor());
-        getLogger().info("[DEBUG]   oldCursor = " + event.getOldCursor());
-        getLogger().info("[DEBUG]   invType = " + event.getInventory().getType());
-        getLogger().info("[DEBUG]   invSlots = " + event.getInventorySlots());
-        getLogger().info("[DEBUG]   rawSlots = " + event.getRawSlots());
-        getLogger().info("[DEBUG]   type = " + event.getType());
-
-        // if a barrel is being dragged into a furnace...
-        // TODO
+        if (event.getInventory() instanceof FurnaceInventory) {
+            if (event.getInventorySlots().contains(/*fuel slot index*/ 1)) {
+                if (isNonEmptyBarrel(event.getOldCursor())) {
+                    event.setCancelled(true);
+                }
+            }
+        }
     }
 
     /**
      * Prevents barrels with contents from being sucked into a furnace.
      */
-    @EventHandler(priority = EventPriority.NORMAL)
+    //@EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryMoveItem(InventoryMoveItemEvent event) {
 
-        getLogger().info("[DEBUG] onInventoryMoveItem()");
-        getLogger().info("[DEBUG]   item = " + event.getItem());
-        getLogger().info("[DEBUG]   source = " + event.getSource().getType());
-        getLogger().info("[DEBUG]   dest = " + event.getDestination().getType());
-
-        if ((event.getDestination() instanceof FurnaceInventory)
-                && isNonEmptyBarrel(event.getItem())) {
-
-            getLogger().info("[DEBUG]     event cancelled!");
-            event.setCancelled(true);
+        if (event.getDestination() instanceof FurnaceInventory) {
+            if (isNonEmptyBarrel(event.getItem())) {
+                event.setCancelled(true);
+            }
         }
     }
 
