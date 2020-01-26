@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="BarrelsPlus:jar">
+    <output-path>$PROJECT_DIR$/out/jars/</output-path>
+    <root id="archive" name="BarrelsPlus.jar">
+      <element id="module-output" name="BarrelsPlus" />
+    </root>
+  </artifact>
+</component>
