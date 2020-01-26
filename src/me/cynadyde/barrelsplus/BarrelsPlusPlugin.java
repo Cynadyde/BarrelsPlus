@@ -8,8 +8,14 @@ import org.bukkit.block.Container;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.inventory.*;
+import org.bukkit.event.block.BlockCanBuildEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
@@ -37,6 +43,10 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
      */
     private static boolean isNonEmptyBarrel(ItemStack item) {
         return item != null && item.getType() == Material.BARREL; // && item.hasItemMeta();
+    }
+
+    private void debug(String message, Object...objs) {
+        getLogger().info("[DEBUG] " + String.format(message, objs));
     }
 
     @Override
@@ -120,6 +130,41 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         if (event.getDestination() instanceof FurnaceInventory) {
             if (isNonEmptyBarrel(event.getItem())) {
                 event.setCancelled(true);
+            }
+        }
+    }
+
+    /**
+     * Test for build permissions with a block other than the barrel.
+     * There is a dumb CraftBukkit bug where barrels with NBT data
+     * cause a POI server error and drop a duplicate of their contents.
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+
+        debug("onPlayeInteract()");
+        debug("  %s", event.getAction());
+
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+
+            debug("    %s", event.getClickedBlock());
+
+            if (event.getClickedBlock() != null) {
+                if (isNonEmptyBarrel(event.getItem())) {
+
+                    BlockCanBuildEvent e = new BlockCanBuildEvent(
+                            event.getClickedBlock(),
+                            event.getPlayer(),
+                            Material.CHEST.createBlockData(),
+                            true);
+
+                    getServer().getPluginManager().callEvent(e);
+
+                    debug("      isBuildable = " + e.isBuildable());
+                    if (!e.isBuildable()) {
+                        event.setCancelled(true);
+                    }
+                }
             }
         }
     }
