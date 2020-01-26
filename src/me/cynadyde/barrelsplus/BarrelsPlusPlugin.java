@@ -33,25 +33,10 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
     /**
      * Tests if the given item stack is a barrel that has contents.
+     * NOTE: all barrels test true in this build.
      */
     private static boolean isNonEmptyBarrel(ItemStack item) {
-
-        if (item != null && item.getType() == Material.BARREL
-                && item.getItemMeta() instanceof BlockStateMeta) {
-
-            BlockStateMeta barrelItemState = (BlockStateMeta) item.getItemMeta();
-            if (barrelItemState.getBlockState() instanceof Barrel) {
-                Barrel barrel = (Barrel) barrelItemState.getBlockState();
-
-                for (ItemStack content : barrel.getInventory().getContents()) {
-                    //noinspection ConstantConditions
-                    if (content != null) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return item != null && item.getType() == Material.BARREL; // && item.hasItemMeta();
     }
 
     @Override
@@ -59,42 +44,54 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
     }
 
-    /**
-     * Prevents barrels with contents from being burnt in a furnace.
+    /*
+     * although onFurnaceBurn()'s impact (per furnace) is negligible,
+     * the event is very rapid, so the other events are used instead.
      */
-    @EventHandler(priority = EventPriority.NORMAL)
-    public void onFurnaceBurn(FurnaceBurnEvent event) {
 
-        if (isNonEmptyBarrel(event.getFuel())) {
-            event.setCancelled(true);
-        }
-    }
+//  /**
+//   * Prevents barrels with contents from being burnt in a furnace.
+//   */
+//  @EventHandler(priority = EventPriority.NORMAL)
+//  public void onFurnaceBurn(FurnaceBurnEvent event) {
+//
+//      if (isNonEmptyBarrel(event.getFuel())) {
+//          event.setCancelled(true);
+//      }
+//  }
 
     /**
      * Prevents barrels with contents from being placed into a furnace.
      */
-    //@EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryClickEvent(InventoryClickEvent event) {
 
         if (event.getInventory() instanceof FurnaceInventory) {
-            if (event.getSlotType() == InventoryType.SlotType.FUEL) {
-                switch (event.getAction()) {
-                    default: break;
-                    case PLACE_ONE:
-                    case PLACE_SOME:
-                    case PLACE_ALL:
-                    case SWAP_WITH_CURSOR:
+            switch (event.getAction()) {
+                default: break;
+                case PLACE_ONE:
+                case PLACE_SOME:
+                case PLACE_ALL:
+                case SWAP_WITH_CURSOR:
+                    if (event.getSlotType() == InventoryType.SlotType.FUEL) {
                         if (isNonEmptyBarrel(event.getCursor())) {
                             event.setCancelled(true);
                         }
-                        break;
-                    case HOTBAR_SWAP:
+                    }
+                    break;
+                case HOTBAR_SWAP:
+                    if (event.getSlotType() == InventoryType.SlotType.FUEL) {
                         if (isNonEmptyBarrel(event.getWhoClicked()
                                 .getInventory().getItem(event.getHotbarButton()))) {
                             event.setCancelled(true);
                         }
-                        break;
-                }
+                    }
+                    break;
+                case MOVE_TO_OTHER_INVENTORY:
+                    if (isNonEmptyBarrel(event.getCurrentItem())) {
+                        event.setCancelled(true);
+                    }
+                    break;
             }
         }
     }
@@ -102,12 +99,12 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     /**
      * Prevents barrels with contents from being dragged into a furnace.
      */
-    //@EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryDrag(InventoryDragEvent event) {
 
         if (event.getInventory() instanceof FurnaceInventory) {
-            if (event.getInventorySlots().contains(/*fuel slot index*/ 1)) {
-                if (isNonEmptyBarrel(event.getOldCursor())) {
+            if (isNonEmptyBarrel(event.getOldCursor())) {
+                if (event.getInventorySlots().contains(/*fuel slot index*/ 1)) {
                     event.setCancelled(true);
                 }
             }
@@ -117,7 +114,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
     /**
      * Prevents barrels with contents from being sucked into a furnace.
      */
-    //@EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onInventoryMoveItem(InventoryMoveItemEvent event) {
 
         if (event.getDestination() instanceof FurnaceInventory) {
