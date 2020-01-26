@@ -5,30 +5,33 @@ import org.bukkit.*;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
+import org.bukkit.entity.EntityType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockCanBuildEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Main class of the BarrelsPlus plugin.
  */
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
+
+    private Map<BoundingBox, Long> poiConflicts = new HashMap<>();
 
     /**
      * Translates ampersands into color codes, then formats the string.
@@ -45,18 +48,26 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         return item != null && item.getType() == Material.BARREL; // && item.hasItemMeta();
     }
 
-    private void debug(String message, Object...objs) {
+    private void debug(String message, Object... objs) {
         getLogger().info("[DEBUG] " + String.format(message, objs));
     }
 
     @Override
     public void onEnable() {
+
         getServer().getPluginManager().registerEvents(this, this);
+
+        getServer().getScheduler().scheduleSyncRepeatingTask(this, () -> {
+            if (!poiConflicts.isEmpty()) {
+                long curTime = System.currentTimeMillis();
+                poiConflicts.entrySet().removeIf(e -> e.getValue() >= curTime);
+            }
+        }, 20L, 20L);
     }
 
     /*
      * although onFurnaceBurn()'s impact (per furnace) is negligible,
-     * the event is very rapid, so the other events are used instead.
+     * the event is very rapid, so the other inv events are used instead.
      */
 
 //  /**
@@ -134,36 +145,75 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * Test for build permissions with a block other than the barrel.
-     * There is a dumb CraftBukkit bug where barrels with NBT data
-     * cause a POI server error and drop a duplicate of their contents.
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onBlockPlace(BlockPlaceEvent event) {
+
+        debug("onBlockPlace()");
+//        debug("  canBuild: " + event.canBuild());
+//        debug("  player: " + event.getPlayer());
+//        debug("  handSlot: " + event.getHand());
+//        debug("  iteminHand: " + event.getItemInHand());
+//        debug("  block:" + event.getBlock());
+//        debug("  blockPlaced: " + event.getBlockPlaced());
+//        debug("  blockAgainst: " + event.getBlockAgainst());
+//        debug("  replacedState: " + event.getBlockReplacedState());
+//        debug("  isCancelled: " + event.isCancelled());
+
+        if (event.getBlockPlaced().getType() == Material.BARREL && event.isCancelled()) {
+
+            debug("  barrel place was cancelled");
+
+            Vector blocKVec = event.getBlock().getLocation().toVector();
+            double randomSpawnRadius = 0.5;
+
+            BoundingBox itemSpawnBounds = new BoundingBox(
+                    blocKVec.getBlockX() - randomSpawnRadius,
+                    blocKVec.getBlockY() - randomSpawnRadius,
+                    blocKVec.getBlockZ() - randomSpawnRadius,
+                    blocKVec.getBlockX() + 1 + randomSpawnRadius,
+                    blocKVec.getBlockY() + 1 + randomSpawnRadius,
+                    blocKVec.getBlockZ() + 1 + randomSpawnRadius
+            );
+            poiConflicts.put(itemSpawnBounds, System.currentTimeMillis() + 1000);
+
+            debug("  now watching area: " + itemSpawnBounds);
+        }
+    }
+
+    /*
+     * onBlockDropItem never gets called... strange.
      */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onPlayerInteract(PlayerInteractEvent event) {
 
-        debug("onPlayeInteract()");
-        debug("  %s", event.getAction());
+//    @EventHandler(priority = EventPriority.NORMAL)
+//    public void onBlockDropItem(BlockDropItemEvent event) {
+//
+//        debug("onBlockDropItem()");
+//        debug("  player: " + event.getPlayer().getName());
+//        debug("  block: " + event.getBlock().getType());
+//        debug("  blockState: " + event.getBlockState());
+//        debug("  items: " + event.getItems());
+//
+//        if (event.getBlockState() instanceof Barrel) {
+//            debug("  is a barrel!");
+//        }
+//    }
 
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onItemSpawn(ItemSpawnEvent event) {
 
-            debug("    %s", event.getClickedBlock());
+        debug("onItemSpawn()");
+//        debug("  entity: " + event.getEntity());
+//        debug("  entityType: " + event.getEntityType());
+//        debug("  location: " + event.getLocation());
+//        debug("  isCancelled: " + event.isCancelled());
 
-            if (event.getClickedBlock() != null) {
-                if (isNonEmptyBarrel(event.getItem())) {
-
-                    BlockCanBuildEvent e = new BlockCanBuildEvent(
-                            event.getClickedBlock(),
-                            event.getPlayer(),
-                            Material.CHEST.createBlockData(),
-                            true);
-
-                    getServer().getPluginManager().callEvent(e);
-
-                    debug("      isBuildable = " + e.isBuildable());
-                    if (!e.isBuildable()) {
-                        event.setCancelled(true);
-                    }
+        if (event.getEntityType() == EntityType.DROPPED_ITEM) {
+            Vector spawnVec = event.getLocation().toVector();
+            for (Map.Entry<BoundingBox, Long> e : poiConflicts.entrySet()) {
+                if (e.getKey().contains(spawnVec)) {
+                    debug("  POI conflicts would block this spawn!");
+                    event.setCancelled(true);
+                    break;
                 }
             }
         }
