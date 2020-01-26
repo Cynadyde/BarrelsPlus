@@ -24,13 +24,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Main class of the BarrelsPlus plugin.
  */
 public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
 
+    /**
+     * Holds bounding boxes where duplicate items may spawn as a result of the CraftBukkit bug.
+     */
     private Map<BoundingBox, Long> poiConflicts = new HashMap<>();
 
     /**
@@ -48,10 +54,6 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         return item != null && item.getType() == Material.BARREL; // && item.hasItemMeta();
     }
 
-    private void debug(String message, Object... objs) {
-        getLogger().info("[DEBUG] " + String.format(message, objs));
-    }
-
     @Override
     public void onEnable() {
 
@@ -64,22 +66,6 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
             }
         }, 20L, 20L);
     }
-
-    /*
-     * although onFurnaceBurn()'s impact (per furnace) is negligible,
-     * the event is very rapid, so the other inv events are used instead.
-     */
-
-//  /**
-//   * Prevents barrels with contents from being burnt in a furnace.
-//   */
-//  @EventHandler(priority = EventPriority.NORMAL)
-//  public void onFurnaceBurn(FurnaceBurnEvent event) {
-//
-//      if (isNonEmptyBarrel(event.getFuel())) {
-//          event.setCancelled(true);
-//      }
-//  }
 
     /**
      * Prevents barrels with contents from being placed into a furnace.
@@ -145,26 +131,20 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * Keep track of where a barrel place event was cancelled.
+     * <p>
+     * This is a workaround for a CraftBukkit bug where cancelling
+     * a block place event for barrels with contents causes them to
+     * drop a duplicate of their contents.
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onBlockPlace(BlockPlaceEvent event) {
 
-        debug("onBlockPlace()");
-//        debug("  canBuild: " + event.canBuild());
-//        debug("  player: " + event.getPlayer());
-//        debug("  handSlot: " + event.getHand());
-//        debug("  iteminHand: " + event.getItemInHand());
-//        debug("  block:" + event.getBlock());
-//        debug("  blockPlaced: " + event.getBlockPlaced());
-//        debug("  blockAgainst: " + event.getBlockAgainst());
-//        debug("  replacedState: " + event.getBlockReplacedState());
-//        debug("  isCancelled: " + event.isCancelled());
-
-        if (event.getBlockPlaced().getType() == Material.BARREL && event.isCancelled()) {
-
-            debug("  barrel place was cancelled");
+        if (event.isCancelled() && event.getBlockPlaced().getType() == Material.BARREL) {
 
             Vector blocKVec = event.getBlock().getLocation().toVector();
-            double randomSpawnRadius = 0.5;
+            double randomSpawnRadius = 0.5; // this radius seems to catch em all
 
             BoundingBox itemSpawnBounds = new BoundingBox(
                     blocKVec.getBlockX() - randomSpawnRadius,
@@ -174,44 +154,25 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
                     blocKVec.getBlockY() + 1 + randomSpawnRadius,
                     blocKVec.getBlockZ() + 1 + randomSpawnRadius
             );
-            poiConflicts.put(itemSpawnBounds, System.currentTimeMillis() + 1000);
-
-            debug("  now watching area: " + itemSpawnBounds);
+            poiConflicts.put(itemSpawnBounds, System.currentTimeMillis() + /*expiration*/ 1000);
         }
     }
 
-    /*
-     * onBlockDropItem never gets called... strange.
+    /**
+     * Intercepts and cancels spawned items that are the
+     * result of the CraftBukkit bug.
+     * <p>
+     * This bug causes a cancelled block place event to
+     * drop a duplicate of barrel contents.
      */
-
-//    @EventHandler(priority = EventPriority.NORMAL)
-//    public void onBlockDropItem(BlockDropItemEvent event) {
-//
-//        debug("onBlockDropItem()");
-//        debug("  player: " + event.getPlayer().getName());
-//        debug("  block: " + event.getBlock().getType());
-//        debug("  blockState: " + event.getBlockState());
-//        debug("  items: " + event.getItems());
-//
-//        if (event.getBlockState() instanceof Barrel) {
-//            debug("  is a barrel!");
-//        }
-//    }
-
     @EventHandler(priority = EventPriority.NORMAL)
     public void onItemSpawn(ItemSpawnEvent event) {
 
-        debug("onItemSpawn()");
-//        debug("  entity: " + event.getEntity());
-//        debug("  entityType: " + event.getEntityType());
-//        debug("  location: " + event.getLocation());
-//        debug("  isCancelled: " + event.isCancelled());
-
         if (event.getEntityType() == EntityType.DROPPED_ITEM) {
             Vector spawnVec = event.getLocation().toVector();
+
             for (Map.Entry<BoundingBox, Long> e : poiConflicts.entrySet()) {
                 if (e.getKey().contains(spawnVec)) {
-                    debug("  POI conflicts would block this spawn!");
                     event.setCancelled(true);
                     break;
                 }
