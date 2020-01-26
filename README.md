@@ -7,8 +7,8 @@ To install, simply place the jar file in your server's `plugins` folder.
 
 ## Downloads
 
-##### For Minecraft 1.14.X:
-> [BarrelsPlus_1.14.4-0.jar](https://github.com/Cynadyde/BarrelsPlus/raw/master/builds/BarrelsPlus_1.14.4-0.jar)
+##### For Minecraft 1.14.X and 1.15.X:
+> [BarrelsPlus_1.15.2-2.jar](https://github.com/Cynadyde/BarrelsPlus/raw/master/builds/BarrelsPlus_1.15.2-2.jar)
 
 ## Bugs & Feedback
 
