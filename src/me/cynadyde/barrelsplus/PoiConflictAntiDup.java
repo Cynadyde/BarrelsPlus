@@ -13,7 +13,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -50,13 +53,8 @@ public class PoiConflictAntiDup implements Listener {
 
             //noinspection ConstantConditions - getContents() may contain null items
             List<ItemStack> duplicates = Arrays.stream(
-                    ((Barrel) event.getBlockPlaced().getState())
-                            .getInventory()
-                            .getContents())
-                    .filter(i -> i != null && !i.getType().isAir())
-                    .collect(Collectors.toList());
-
-            System.out.println(String.format("detecting a POI conflict with these duplicated items: %s", duplicates));
+                    ((Barrel) event.getBlockPlaced().getState()).getInventory().getContents()
+            ).filter(i -> i != null && !i.getType().isAir()).collect(Collectors.toList());
 
             if (duplicates.size() > 0) {
 
@@ -75,7 +73,6 @@ public class PoiConflictAntiDup implements Listener {
                 for (ItemStack duplicate : duplicates) {
                     poiConflicts.add(new PoiConflict(world, itemSpawnBounds, duplicate));
                 }
-                System.out.println(String.format("  current poiConflicts (x%d): %s", poiConflicts.size(), new ArrayList<>(poiConflicts)));
             }
         }
     }
@@ -87,30 +84,20 @@ public class PoiConflictAntiDup implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onItemSpawn(ItemSpawnEvent event) {
 
-
         if (event.getEntityType() == EntityType.DROPPED_ITEM) {
             Vector spawnVec = event.getLocation().toVector();
 
-            System.out.println(String.format("An item has spawned at %s: %s", event.getLocation(), event.getEntity().getItemStack()));
-
             for (PoiConflict e : poiConflicts) {
                 if (e.getWorld().equals(event.getEntity().getWorld())) {
-                    System.out.println(String.format("  testing %s...", e));
-                    System.out.println("    found matching world!");
-
                     if (e.getArea().contains(spawnVec)) {
-                        System.out.println("    found matching area!\n");
-
                         if (e.getDuplicate().isSimilar(event.getEntity().getItemStack())) {
-                            System.out.println("    found matching item!");
 
-                            int remaining = e.getDuplicate().getAmount() - event.getEntity().getItemStack().getAmount();
-                            if (remaining > 0) {
-                                e.getDuplicate().setAmount(remaining);
-                            }
-                            else {
-                                poiConflicts.remove(e);
-                            }
+                            int remaining = e.getDuplicate().getAmount()
+                                    - event.getEntity().getItemStack().getAmount();
+
+                            if (remaining > 0) { e.getDuplicate().setAmount(remaining); }
+                            else { poiConflicts.remove(e); }
+
                             event.setCancelled(true);
                             break;
                         }
@@ -129,6 +116,10 @@ public class PoiConflictAntiDup implements Listener {
         return poiConflicts;
     }
 
+    /**
+     * An expectation that a given item stack will spawn in a given vicinity,
+     * and that it is a glitch and should be immediately removed.
+     */
     private static class PoiConflict {
 
         private final World world;
@@ -151,11 +142,6 @@ public class PoiConflictAntiDup implements Listener {
 
         ItemStack getDuplicate() {
             return duplicate;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("PoiConflict(%s # %s @ %s)", duplicate, world.getName(), area);
         }
     }
 }
