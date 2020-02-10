@@ -62,7 +62,7 @@ public class BarrelsPlusPlugin extends JavaPlugin implements Listener {
         getServer().getScheduler().scheduleSyncRepeatingTask(this, () -> {
             if (!poiConflicts.isEmpty()) {
                 long curTime = System.currentTimeMillis();
-                poiConflicts.entrySet().removeIf(e -> e.getValue() >= curTime);
+                poiConflicts.entrySet().removeIf(e -> curTime >= e.getValue());
             }
         }, 20L, 20L);
     }
