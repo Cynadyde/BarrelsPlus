@@ -13,10 +13,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * The plugin's event listener to prevent
@@ -51,10 +49,16 @@ public class PoiConflictAntiDup implements Listener {
                 && event.getBlockPlaced().getState() instanceof Barrel) {
 
             //noinspection ConstantConditions - getContents() may contain null items
-            ItemStack[] duplicates = (ItemStack[]) Arrays.stream(((Barrel) event.getBlockPlaced()
-                    .getState()).getInventory().getContents()).filter(Objects::nonNull).toArray();
+            List<ItemStack> duplicates = Arrays.stream(
+                    ((Barrel) event.getBlockPlaced().getState())
+                            .getInventory()
+                            .getContents())
+                    .filter(i -> i != null && !i.getType().isAir())
+                    .collect(Collectors.toList());
 
-            if (duplicates.length > 0) {
+            System.out.println(String.format("detecting a POI conflict with these duplicated items: %s", duplicates));
+
+            if (duplicates.size() > 0) {
 
                 World world = event.getBlockPlaced().getWorld();
                 Vector blocKVec = event.getBlock().getLocation().toVector();
@@ -71,6 +75,7 @@ public class PoiConflictAntiDup implements Listener {
                 for (ItemStack duplicate : duplicates) {
                     poiConflicts.add(new PoiConflict(world, itemSpawnBounds, duplicate));
                 }
+                System.out.println(String.format("  current poiConflicts (x%d): %s", poiConflicts.size(), new ArrayList<>(poiConflicts)));
             }
         }
     }
@@ -82,14 +87,30 @@ public class PoiConflictAntiDup implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onItemSpawn(ItemSpawnEvent event) {
 
+
         if (event.getEntityType() == EntityType.DROPPED_ITEM) {
             Vector spawnVec = event.getLocation().toVector();
 
+            System.out.println(String.format("An item has spawned at %s: %s", event.getLocation(), event.getEntity().getItemStack()));
+
             for (PoiConflict e : poiConflicts) {
                 if (e.getWorld().equals(event.getEntity().getWorld())) {
-                    if (e.getArea().contains(spawnVec)) {
-                        if (e.getDuplicate().equals(event.getEntity().getItemStack())) {
+                    System.out.println(String.format("  testing %s...", e));
+                    System.out.println("    found matching world!");
 
+                    if (e.getArea().contains(spawnVec)) {
+                        System.out.println("    found matching area!\n");
+
+                        if (e.getDuplicate().isSimilar(event.getEntity().getItemStack())) {
+                            System.out.println("    found matching item!");
+
+                            int remaining = e.getDuplicate().getAmount() - event.getEntity().getItemStack().getAmount();
+                            if (remaining > 0) {
+                                e.getDuplicate().setAmount(remaining);
+                            }
+                            else {
+                                poiConflicts.remove(e);
+                            }
                             event.setCancelled(true);
                             break;
                         }
@@ -117,7 +138,7 @@ public class PoiConflictAntiDup implements Listener {
         PoiConflict(World world, BoundingBox area, ItemStack duplicate) {
             this.world = world;
             this.area = area;
-            this.duplicate = duplicate;
+            this.duplicate = duplicate.clone();
         }
 
         World getWorld() {
@@ -130,6 +151,11 @@ public class PoiConflictAntiDup implements Listener {
 
         ItemStack getDuplicate() {
             return duplicate;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("PoiConflict(%s # %s @ %s)", duplicate, world.getName(), area);
         }
     }
 }
